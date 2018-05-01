@@ -125,7 +125,7 @@ def unpack_authors_list(authors_df):
     n_eqs = authors_df["equivalent"].apply(lambda x: len(x))
     max_eqs = n_eqs.max()
     for i in range(0, max_eqs):
-        authors_df["equivalent_" + str(i)] = np.nan
+        authors_df["equivalent_" + str(i)] = ""
     for i in authors_df.index:
         for j in range(0, n_eqs[i]):
             authors_df.set_value(i, "equivalent_" +
@@ -151,7 +151,8 @@ def author_corresp(authors_df, eqs_cols, author_list):
 
 def search_auth(def_auths, auth_name):
     query_auth = def_auths[def_auths.uniformat.str.contains(auth_name)]
-    return query_auth
+    for auth_list in query_auth.equivalent :
+        print(auth_list)
 
 
 # Path to the data
@@ -197,15 +198,16 @@ cleaned = cleaned.reset_index(drop=True)
 # Save the dataframe as csv
 cleaned.to_csv(path + "authors.csv", index=False)
 
-# Add columns for 1st authors, 2nd authors, and so on, the irrelevant ones
-# for a paper are set to np.nan
-eqs_cols = ["equivalent_" + str(i) for i in range(0, 7)]
-cleaned = unpack_authors_list(cleaned)
+cleaned_cop = cleaned.copy()
+# eqs_cols = ["equivalent_" + str(i) for i in range(0, max_equivalence)]
+cleaned_cop = unpack_authors_list(cleaned_cop)
 
-# Find authors indexes for each paper in attrs
+# Find authors indexes for each paper in attrs (WARNING : TAKES A LITTLE MORE THAN AN HOUR)
+maxs_eq = max(cleaned_cop.equivalent.apply(lambda x: len(x)))
+eqs_cols = ["equivalent_" + str(i) for i in range(0, maxs_eq)]
 start = time.clock()
 attrs["authors_nos"] = attrs["authors_list"].apply(
-    lambda x: author_corresp(cleaned, eqs_cols, x))
+    lambda x: author_corresp(cleaned_cop, eqs_cols, x))
 end = time.clock()
 print(end - start)
 
