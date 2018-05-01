@@ -1,0 +1,4 @@
+# Untrack pycharm projects files
+**/.idea
+**/Data
+**/Output
