@@ -35,7 +35,17 @@ def uniformize_names(str1):
         return str1
 
 
-def author_comparison(potential_match, author, thresh):
+def author_comparison(potential_match, author, thresh=0.1):
+    """
+    Function to determine (approximately) if two authors are likely to be the same
+
+    Params:
+        potential_match (str) : potential match to compare author to
+        author (str) : author to match
+        thresh (float) : between 0 and 1, the normalized Levensthein distance tolerance
+    Returns:
+        bool : True if is likely to be a match and False otherwise
+    """
     potential_split = potential_match.split(" ")
     author_split = author.split(" ")
     dist_last = normalized_edit_distance(potential_split[-1],
@@ -171,8 +181,8 @@ df_authors_reduced = df_authors.iloc[10000: 12000, :].copy()
 
 # Start mapping authors (finding equivalent ones)
 start = time.clock()
-# cleaned = map_authors(df_authors, 0.12)
-cleaned = map_authors(df_authors_reduced, 0.12)
+cleaned = map_authors(df_authors, 0.12)
+# cleaned = map_authors(df_authors_reduced, 0.12)
 end = time.clock()
 print(end - start)
 
