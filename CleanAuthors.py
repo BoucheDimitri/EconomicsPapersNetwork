@@ -9,7 +9,7 @@ import time
 
 def authors_parser(authors_string, sep=";"):
     authors = authors_string.split("; ")
-    for i in range(0, len(authors)) :
+    for i in range(0, len(authors)):
         if authors[i][0] == " ":
             authors[i] = authors[i][1:]
     return authors
@@ -28,7 +28,7 @@ def uniformize_names(str1):
         splitted = str1.split(", ")
         if len(splitted) > 1:
             str1bis = splitted[1] + " " + splitted[0]
-        else :
+        else:
             str1bis = str1
         return str1bis
     else:
@@ -41,41 +41,52 @@ def map_authors(auths_df, thresh):
         author = auths_df.loc[i, "uniformat"]
         author_original = auths_df.loc[i, "original"]
         splitted = author.split(" ")
-        ind_search = cleaned_df[cleaned_df["uniformat"].str.contains(splitted[-1], regex=False)].index
+        ind_search = cleaned_df[cleaned_df["uniformat"].str.contains(
+            splitted[-1], regex=False)].index
         exists_similar = False
-        for ind in ind_search :
+        for ind in ind_search:
             unisplit = cleaned_df["uniformat"][ind].split(" ")
             dist_last = normalized_edit_distance(unisplit[-1],
                                                  splitted[-1])
             first_test = dist_last <= thresh
-            if first_test :
+            if first_test:
                 dist = normalized_edit_distance(cleaned_df["uniformat"][ind],
-                                            author)
+                                                author)
                 dist_test = dist <= thresh
                 if dist_test:
                     exists_similar = True
                     cleaned_df["equivalent"][ind].append(author_original)
                 else:
-                    len_test = (len(splitted[0]) == 1) or (len(unisplit[0]) == 1)
+                    len_test = (len(splitted[0]) == 1) or (
+                        len(unisplit[0]) == 1)
                     if not len_test:
-                        dist2 = normalized_edit_distance(unisplit[0], splitted[0])
+                        dist2 = normalized_edit_distance(
+                            unisplit[0], splitted[0])
                         if dist2 <= thresh:
                             exists_similar = True
-                            cleaned_df["equivalent"][ind].append(author_original)
+                            cleaned_df["equivalent"][ind].append(
+                                author_original)
                         elif ((splitted[0][1] == ".") or (unisplit[0][1] == ".")) and (splitted[0][0] == unisplit[0][0]):
                             exists_similar = True
-                            cleaned_df["equivalent"][ind].append(author_original)
+                            cleaned_df["equivalent"][ind].append(
+                                author_original)
                     else:
                         if splitted[0][0] == unisplit[0][0]:
                             exists_similar = True
-                            cleaned_df["equivalent"][ind].append(author_original)
+                            cleaned_df["equivalent"][ind].append(
+                                author_original)
         if not exists_similar:
-            df = pd.DataFrame(columns=["original", "uniformat", "equivalent"], index=[0])
+            df = pd.DataFrame(
+                columns=[
+                    "original",
+                    "uniformat",
+                    "equivalent"],
+                index=[0])
             df.set_value(0, "original", author_original)
             df.set_value(0, "uniformat", author)
             df.set_value(0, "equivalent", [author_original])
             cleaned_df = cleaned_df.append(df, ignore_index=True)
-        if i%1000 == 0:
+        if i % 1000 == 0:
             print(i)
     return cleaned_df
 
@@ -87,19 +98,20 @@ def unpack_authors_list(authors_df):
         authors_df["equivalent_" + str(i)] = np.nan
     for i in authors_df.index:
         for j in range(0, n_eqs[i]):
-            authors_df.set_value(i, "equivalent_" + str(j), authors_df.loc[i, "equivalent"][j])
+            authors_df.set_value(i, "equivalent_" +
+                                 str(j), authors_df.loc[i, "equivalent"][j])
     return authors_df
 
 
 def author_corresp(authors_df, eqs_cols, author_list):
     n_eqs = len(eqs_cols)
     authors_nos = []
-    for author in author_list :
+    for author in author_list:
         found = False
         i = 0
         while (i <= n_eqs) and (not found):
             search = authors_df[eqs_cols[i]].str.contains(author, regex=False)
-            ind_search = search[search == True].index
+            ind_search = search[search].index
             if len(ind_search) >= 1:
                 found = True
                 authors_nos.append(ind_search[0])
@@ -110,6 +122,7 @@ def author_corresp(authors_df, eqs_cols, author_list):
 def search_auth(def_auths, auth_name):
     query_auth = def_auths[def_auths.uniformat.str.contains(auth_name)]
     return query_auth
+
 
 # Path to the data
 path = "C://Users//Dimitri//Desktop//ENSAE3A//EconomicsPapersNetwork//Data//"
@@ -146,20 +159,23 @@ print(end - start)
 # Filter out the cases where multiple authors points to one
 print(cleaned[cleaned.equivalent.apply(lambda x: len(x)) > 1])
 
-# Sort the resulting modified authors dataframe by "uniformat" and reset its index
+# Sort the resulting modified authors dataframe by "uniformat" and reset
+# its index
 cleaned = cleaned.sort_values(by="uniformat")
 cleaned = cleaned.reset_index(drop=True)
 
 # Save the dataframe as csv
 cleaned.to_csv(path + "authors.csv", index=False)
 
-# Add columns for 1st authors, 2nd authors, and so on, the irrelevant ones for a paper are set to np.nan
+# Add columns for 1st authors, 2nd authors, and so on, the irrelevant ones
+# for a paper are set to np.nan
 eqs_cols = ["equivalent_" + str(i) for i in range(0, 7)]
 cleaned = unpack_authors_list(cleaned)
 
 # Find authors indexes for each paper in attrs
 start = time.clock()
-attrs["authors_nos"] = attrs["authors_list"].apply(lambda x: author_corresp(cleaned, eqs_cols, x))
+attrs["authors_nos"] = attrs["authors_list"].apply(
+    lambda x: author_corresp(cleaned, eqs_cols, x))
 end = time.clock()
 print(end - start)
 
