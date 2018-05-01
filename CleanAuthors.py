@@ -35,6 +35,50 @@ def uniformize_names(str1):
         return str1
 
 
+def author_comparison(potential_match, author, thresh):
+    potential_split = potential_match.split(" ")
+    author_split = author.split(" ")
+    dist_last = normalized_edit_distance(potential_split[-1],
+                                         author_split[-1])
+    # First, check that last string in the name (hopefully, the last name) is
+    # coherent
+    first_test = dist_last <= thresh
+    similar = False
+    if first_test:
+        # Indicator for the case where the first string in the name is just one
+        # character
+        len_test = (len(author_split[0]) == 1) or (
+            len(potential_split[0]) == 1)
+        # Indicator for the case where the two have the same lenghts and more than two elements each,
+        # in that case we can (we do) test on the first character of the second
+        # string (the "middle name") as well
+        same_len_test = (len(author_split) >= 3) and (
+            len(author_split) == len(potential_split))
+        # Levensthein distance between the first strings (the first name
+        # hopefully)
+        dist2 = normalized_edit_distance(
+            author_split[0], potential_split[0])
+        # Middle test is active only when same_len_test is True and the length
+        # of both names is > 1
+        if (len(author_split) > 1) and (
+                len(potential_split) > 1) and same_len_test:
+            middle_test = author_split[1][0] == potential_split[1][0]
+        else:
+            middle_test = True
+        # Case where the first string is just on character
+        if len_test:
+            similar = (potential_split[0][0] ==
+                       author_split[0][0]) and middle_test
+        # General test on first using Levensthein distance
+        elif dist2 <= thresh and middle_test:
+            similar = True
+        # Case where the first string is just one character followed by a "."
+        elif ((potential_split[0][1] == ".") or (author_split[0][1] == ".")) and (
+                potential_split[0][0] == author_split[0][0]) and middle_test:
+            similar = True
+    return similar
+
+
 def map_authors(auths_df, thresh):
     cleaned_df = pd.DataFrame(columns=["original", "uniformat", "equivalent"])
     for i in auths_df.index:
@@ -45,36 +89,12 @@ def map_authors(auths_df, thresh):
             splitted[-1], regex=False)].index
         exists_similar = False
         for ind in ind_search:
-            unisplit = cleaned_df["uniformat"][ind].split(" ")
-            dist_last = normalized_edit_distance(unisplit[-1],
-                                                 splitted[-1])
-            first_test = dist_last <= thresh
-            if first_test:
-                dist = normalized_edit_distance(cleaned_df["uniformat"][ind],
-                                                author)
-                dist_test = dist <= thresh
-                if dist_test:
-                    exists_similar = True
-                    cleaned_df["equivalent"][ind].append(author_original)
-                else:
-                    len_test = (len(splitted[0]) == 1) or (
-                        len(unisplit[0]) == 1)
-                    if not len_test:
-                        dist2 = normalized_edit_distance(
-                            unisplit[0], splitted[0])
-                        if dist2 <= thresh:
-                            exists_similar = True
-                            cleaned_df["equivalent"][ind].append(
-                                author_original)
-                        elif ((splitted[0][1] == ".") or (unisplit[0][1] == ".")) and (splitted[0][0] == unisplit[0][0]):
-                            exists_similar = True
-                            cleaned_df["equivalent"][ind].append(
-                                author_original)
-                    else:
-                        if splitted[0][0] == unisplit[0][0]:
-                            exists_similar = True
-                            cleaned_df["equivalent"][ind].append(
-                                author_original)
+            potential_match = cleaned_df["uniformat"][ind]
+            similar = author_comparison(potential_match, author, thresh)
+            if similar:
+                cleaned_df["equivalent"][ind].append(
+                    author_original)
+                exists_similar = True
         if not exists_similar:
             df = pd.DataFrame(
                 columns=[
@@ -151,8 +171,8 @@ df_authors_reduced = df_authors.iloc[10000: 12000, :].copy()
 
 # Start mapping authors (finding equivalent ones)
 start = time.clock()
-cleaned = map_authors(df_authors, 0.12)
-# cleaned = map_authors(df_authors_reduced, 0.12)
+# cleaned = map_authors(df_authors, 0.12)
+cleaned = map_authors(df_authors_reduced, 0.12)
 end = time.clock()
 print(end - start)
 
