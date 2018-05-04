@@ -209,4 +209,4 @@ tsh=60
 top_CoA=list({k: v for k, v in C_CoA.items() if v > tsh}.keys())
 auth_coresp.loc[top_CoA]
 
-search_auth("Friedman")
+search_auth("Stiglitz")

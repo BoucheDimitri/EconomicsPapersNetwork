@@ -121,6 +121,23 @@ def map_authors(auths_df, thresh):
     return cleaned_df
 
 
+def str_to_list(x):
+    """
+    Interpret strings of the form "['int1', 'int2']" as the list [int1, int2]
+
+    Params:
+        x (str) : the string to interpret
+    Returns:
+        list : the output list
+    """
+    x = x.replace("[", "")
+    x = x.replace("]", "")
+    splitted = x.split("', ")
+    y = [z.replace("'", "") for z in splitted]
+    return y
+
+
+
 def unpack_authors_list(authors_df):
     n_eqs = authors_df["equivalent"].apply(lambda x: len(x))
     max_eqs = n_eqs.max()
@@ -139,7 +156,7 @@ def author_corresp(authors_df, eqs_cols, author_list):
     for author in author_list:
         found = False
         i = 0
-        while (i <= n_eqs) and (not found):
+        while (i < n_eqs) and (not found):
             search = authors_df[eqs_cols[i]].str.contains(author, regex=False)
             ind_search = search[search].index
             if len(ind_search) >= 1:
@@ -198,13 +215,33 @@ cleaned = cleaned.reset_index(drop=True)
 # Save the dataframe as csv
 cleaned.to_csv(path + "authors.csv", index=False)
 
-cleaned_cop = cleaned.copy()
+# Reload the data
+cleaned_cop = pd.read_csv(path + "authors.csv", encoding = "ISO-8859-1")
+
+# cleaned_cop = cleaned.copy()
 # eqs_cols = ["equivalent_" + str(i) for i in range(0, max_equivalence)]
-cleaned_cop = unpack_authors_list(cleaned_cop)
+
+cleaned_cop["equivalent"] = cleaned_cop["equivalent"].apply(str_to_list)
+cleaned_bis = unpack_authors_list(cleaned_cop)
 
 # Find authors indexes for each paper in attrs (WARNING : TAKES A LITTLE MORE THAN AN HOUR)
 maxs_eq = max(cleaned_cop.equivalent.apply(lambda x: len(x)))
 eqs_cols = ["equivalent_" + str(i) for i in range(0, maxs_eq)]
+
+
+
+# index_stiglitz = attrs[attrs["authors"].str.contains("Stiglitz")].index
+#attrs_stiglitz = attrs.iloc[index_stiglitz, :].copy()
+
+
+#start = time.clock()
+#attrs_stiglitz["authors_nos"] = attrs_stiglitz["authors_list"].apply(
+#    lambda x: author_corresp(cleaned_bis, eqs_cols, x))
+#end = time.clock()
+#print(end - start)
+
+
+
 start = time.clock()
 attrs["authors_nos"] = attrs["authors_list"].apply(
     lambda x: author_corresp(cleaned_cop, eqs_cols, x))
@@ -212,4 +249,4 @@ end = time.clock()
 print(end - start)
 
 # Save to csv
-attrs.to_csv(path + "attrs_nos.csv")
+attrs.to_csv(path + "attrs_nos_bis.csv")
