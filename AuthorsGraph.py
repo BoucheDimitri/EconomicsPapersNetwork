@@ -28,7 +28,10 @@ def str_to_list(x):
     x = x.replace("[", "")
     x = x.replace("]", "")
     splitted = x.split(", ")
-    no_list = [int(i) for i in splitted]
+    if splitted == "":
+        no_list = []
+    else:
+        no_list = [int(i) for i in splitted]
     return no_list
 
 
@@ -76,7 +79,7 @@ def sort_edges(edges_list):
 def weighted_edges_list(sorted_edges_list):
     """
     Convert list of authors pairs to a dict of dict to pass to the networkx.Graph constructor.
-    Count the duplicates and store them in the "weights" attributes of the dictionnary so that
+    Count the duplicates and store them in the "weights" attributes of the dictionary so that
     an edge that appears k times in sorted_edges_list will get a weight of k in the graph.
 
     Params:
@@ -106,10 +109,10 @@ def get_nodes_list(auths_nums):
     """
     concat = []
     for auth_list in auths_nums:
-        concat +=  auth_list
+        concat += auth_list
     return list(set(concat))
 
-
+# from there
 def count_CoA(auths_nums):
     """
     Get the different authors from the series of list of authors.
@@ -122,7 +125,7 @@ def count_CoA(auths_nums):
     """
     concat = []
     for auth_list in auths_nums:
-        concat +=  auth_list
+        concat += auth_list
     concat.sort()
     return Counter(concat)
 
@@ -133,6 +136,7 @@ def search_auth(auth_name):
     for i in resp_auth:
         print(auth_coresp.uniformat[i],C_CoA[i])
 
+#to there
 
 # Path to the data
 path = "C://Users//Dimitri//Desktop//ENSAE3A//EconomicsPapersNetwork//Tables//"
