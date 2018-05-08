@@ -5,6 +5,7 @@
 
 import itertools
 from collections import Counter
+import numpy as np
 
 
 def get_edges_list(auths_nums):
@@ -80,3 +81,55 @@ def get_nodes_list(auths_nums):
     for auth_list in auths_nums:
         concat += auth_list
     return list(set(concat))  # set() avoid duplicates
+
+
+def article_matching(url_id_series, to_match):
+    """
+    Match url_ids from url_id_series to each element of to_match
+    (concretely : transforms urls into their article_id from attrs)
+
+    :param url_id_series: (pandas.core.series.Series)
+     series which index is the article number and which field is its url
+    :param to_match: (pandas.core.series.Series)
+     series of url to match to articles numbers in url_id_series
+
+    :return : (pandas.core.series.Series) to_match with urls replaced
+    by articles numbers from url_id_series
+    """
+    to_match_copy = to_match.copy()
+    uniques = set(to_match_copy.values)
+    for url_id in uniques:
+        matchs_inds = url_id_series[url_id_series == url_id].index
+        if len(matchs_inds) == 1:
+            num = matchs_inds[0]
+        else:
+            num = np.nan
+        to_match_copy[to_match_copy == url_id] = num
+    return to_match_copy
+
+
+def match_articles(refs_df, id_series, begin_with="referred_to"):
+    """
+    Match all articles in the references (or citations) dataframe.
+    Matching is done first for the article to which the reference is since they are not all in our database,
+    we thus remove the deadlinks before matching the articles from which the reference originates
+    which spares a lot of useless computations.
+
+    :param refs_df: (pandas.core.frame.DataFrame)
+    :param id_series:
+    :param begin_with:
+    :return:
+    """
+    if begin_with == "referring":
+        col1 = "referring"
+        col2 = "referred_to"
+    else:
+        col1 = "referred_to"
+        col2 = "referring"
+    refs_df_copy = refs_df.copy()
+    refs_df_copy.sort_values(by=col1, inplace=True)
+    refs_df_copy[col1] = article_matching(id_series, refs_df_copy[col1])
+    refs_df_copy.dropna(axis=0, how="any", inplace=True)
+    refs_df_copy.sort_values(by=col2, inplace=True)
+    refs_df_copy[col2] = article_matching(id_series, refs_df_copy[col2])
+    return refs_df_copy
