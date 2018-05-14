@@ -100,6 +100,23 @@ def expand_root(root_nodes, graph, d):
     return nodes
 
 
+def query_subgraph(graph, d, attrs_df, query_string, search_in=("title", "keywords"), how="union"):
+    """
+    Find expanded subgraph for a query
+
+    :param graph: (networkx.classes.digraph.DiGraph) the graph
+    :param d: how many predecessors to include at most ?
+    :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
+    :param query_string: (str) The query string
+    :param search_in: (tuple) The columns to include for the query
+    :param how: (str) How to join the indexes in the list ?
+    :return: (networkx.classes.digraph.DiGraph) the expanded subgraph for the query
+    """
+    root_nodes = subgraph_root(attrs_df, query_string, search_in, how)
+    expanded = expand_root(root_nodes, graph, d)
+    return graph.subgraph(expanded)
+
+
 
 
 
@@ -123,13 +140,15 @@ all_edges = cits_edges + refs_edges
 # Construct nx.DiGraph from stacked edges (refs + cits)
 cits_refs_graph = nx.DiGraph(all_edges)
 
+d = 400
+qstring = "central bank"
+subtest = query_subgraph(cits_refs_graph, d, attrs, qstring)
 
+# search_inds = topic_query(attrs, "monetary policy")
+# inter_inds = indexlist_inter(search_inds)
+# union_inds = indexlist_union(search_inds)
 
-search_inds = topic_query(attrs, "monetary policy")
-inter_inds = indexlist_inter(search_inds)
-union_inds = indexlist_union(search_inds)
-
-root = subgraph_root(attrs, "monetary policy")
-expanded = expand_root(root, cits_refs_graph, 400)
+# root = subgraph_root(attrs, "monetary policy")
+# expanded = expand_root(root, cits_refs_graph, 400)
 
 
