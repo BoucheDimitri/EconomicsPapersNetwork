@@ -133,3 +133,17 @@ def match_articles(refs_df, id_series, begin_with="referred_to"):
     refs_df_copy.sort_values(by=col2, inplace=True)
     refs_df_copy[col2] = article_matching(id_series, refs_df_copy[col2])
     return refs_df_copy
+
+
+def edgesdf_to_edgeslist(refs_df_id):
+    """
+    Convert dataframe of refs/cits edges with columns "referring" and "referred_to"
+    to a list of edges to pass to the networkx constructor
+    :param refs_df_id:
+    :return:
+    """
+    edges_list = []
+    for row in refs_df_id.iterrows():
+        edges_list.append((row[1]["referring"], row[1]["referred_to"]))
+    return edges_list
+
