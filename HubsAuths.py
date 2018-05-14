@@ -3,6 +3,7 @@ import numpy as np
 import importlib
 import networkx as nx
 import CitNet.GraphCN as GraphCN
+import scipy.sparse as sparse
 import os
 
 importlib.reload(GraphCN)
@@ -117,6 +118,24 @@ def query_subgraph(graph, d, attrs_df, query_string, search_in=("title", "keywor
     return graph.subgraph(expanded)
 
 
+def compute_authorities(subgraph):
+    nodes = list(subgraph)
+    nodes.sort()
+    print(nodes)
+    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
+    AT = sparse.csr_matrix.transpose(A)
+    ATA = sparse.csr_matrix.dot(AT, A)
+    w, xstar = sparse.linalg.eigs(ATA, k=1)
+    xstar = np.real(xstar).reshape((xstar.shape[0], ))
+    print(xstar[:10])
+    indsort = np.argsort(xstar)[::-1]
+    nodes = np.array(nodes)
+    return nodes[indsort]
+    # return np.real(xstar)
+
+
+
+
 
 
 
@@ -140,8 +159,8 @@ all_edges = cits_edges + refs_edges
 # Construct nx.DiGraph from stacked edges (refs + cits)
 cits_refs_graph = nx.DiGraph(all_edges)
 
-d = 400
-qstring = "central bank"
+d = 10000
+qstring = "behavioral"
 subtest = query_subgraph(cits_refs_graph, d, attrs, qstring)
 
 # search_inds = topic_query(attrs, "monetary policy")
@@ -151,4 +170,5 @@ subtest = query_subgraph(cits_refs_graph, d, attrs, qstring)
 # root = subgraph_root(attrs, "monetary policy")
 # expanded = expand_root(root, cits_refs_graph, 400)
 
-
+authorities = compute_authorities(subtest)
+print(max(authorities))
