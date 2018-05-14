@@ -8,17 +8,96 @@ import os
 importlib.reload(GraphCN)
 
 
-def topic_query(attrs_df, query_string, search_in=("title", "keywords"), how="union"):
+def topic_query(attrs_df, query_string, search_in=("title", "keywords")):
+    """
+    Return indexes corresponding to a given query
+
+    :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
+    :param query_string: (str) The query string
+    :param search_in: (tuple) The columns to include for the query
+    :return: list : the list of result indexes, one per column in search_in
+    """
     inds = []
     for col in search_in:
-        inds.append(attrs_df[attrs_df[col].str.contains(query_string, regex=False)].index)
+        bool_ind = attrs_df[col].str.contains(query_string, regex=False)
+        bool_ind = bool_ind.replace(np.nan, False)
+        inds.append(attrs_df[bool_ind].index)
+    return inds
 
-def set_root():
-    return 0
+
+def indexlist_inter(indexlist):
+    """
+    Intersection of all elements of a list of indexes
+
+    :param indexlist: (list) : the list of pandas indexes (pandas.indexes.range.RangeIndex)
+    :return: The intersected index ((pandas.indexes.range.RangeIndex)
+    """
+    first = True
+    for ind in indexlist:
+        if first:
+            inter = ind
+            first = False
+        else:
+            inter = inter.intersection(ind)
+    return inter
 
 
-def expand_root():
-    return 0
+def indexlist_union(indexlist):
+    """
+    Union of all elements of a list of indexes
+
+    :param indexlist: (list) : the list of pandas indexes (pandas.indexes.range.RangeIndex)
+    :return: The union index (pandas.indexes.range.RangeIndex)
+    """
+    first = True
+    for ind in indexlist:
+        if first:
+            inter = ind
+            first = False
+        else:
+            inter = inter.union(ind)
+    return inter
+
+
+def subgraph_root(attrs_df, query_string, search_in=("title", "keywords"), how="union"):
+    """
+    Root nodes for the subgraph generation of Hubs and Authorities
+
+    :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
+    :param query_string: (str) The query string
+    :param search_in: (tuple) The columns to include for the query
+    :param how: (str) How to join the indexes in the list ?
+    :return: the index of the nodes (pandas.indexes.range.RangeIndex)
+    """
+    inds = topic_query(attrs_df, query_string, search_in)
+    if how == "inter":
+        return indexlist_inter(inds)
+    else:
+        return indexlist_union(inds)
+
+
+def expand_root(root_nodes, graph, d):
+    """
+    Expand root nodes by including their successors and some of their predecessors (d to be exact)
+
+    :param root_nodes: (list-like) the roots nodes
+    :param graph: (networkx.classes.digraph.DiGraph) the graph
+    :param d: how many predecessors to include at most ?
+    :return: the expanded nodes list (list).
+    """
+    nodes = []
+    all_nodes = set(graph.nodes)
+    root_nodes = set(root_nodes).intersection(all_nodes)
+    for node in root_nodes:
+        successors = list(graph.successors(node))
+        predecessors = list(graph.predecessors(node))
+        if len(predecessors) >= d:
+            np.random.shuffle(predecessors)
+            new_nodes = set(successors + predecessors[0: d])
+        else:
+            new_nodes = set(successors + predecessors)
+        nodes += new_nodes
+    return nodes
 
 
 
@@ -44,5 +123,13 @@ all_edges = cits_edges + refs_edges
 # Construct nx.DiGraph from stacked edges (refs + cits)
 cits_refs_graph = nx.DiGraph(all_edges)
 
+
+
+search_inds = topic_query(attrs, "monetary policy")
+inter_inds = indexlist_inter(search_inds)
+union_inds = indexlist_union(search_inds)
+
+root = subgraph_root(attrs, "monetary policy")
+expanded = expand_root(root, cits_refs_graph, 400)
 
 
