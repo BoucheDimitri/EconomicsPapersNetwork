@@ -139,7 +139,7 @@ path = "C://Users//Dimitri//Desktop//ENSAE3A//EconomicsPapersNetwork//Tables//"
 # path= os.path.join(os.getcwd(),"Tables")
 
 # Load the data
-attrs_nos = pd.read_csv(path + "/attrs_nos.csv", encoding = "ISO-8859-1")
+attrs_nos = pd.read_csv(path + "attrs_nos_bis.csv", encoding = "ISO-8859-1")
 
 # Print the data
 attrs_nos.head()
