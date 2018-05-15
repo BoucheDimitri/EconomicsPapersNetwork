@@ -192,7 +192,7 @@ def sort_nodes(xy, nodes_list):
     return np.array(nodes_list)[xind]
 
 
-def compute_authorities(subgraph, nauths=1, thresh=1e-10):
+def compute_authorities(subgraph, nauths=1):
     """
     Compute authorities coefficients the eigen vectors way
 
@@ -206,9 +206,18 @@ def compute_authorities(subgraph, nauths=1, thresh=1e-10):
     A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
     AT = sparse.csr_matrix.transpose(A)
     ATA = sparse.csr_matrix.dot(AT, A)
-    w, xstar = sparse.linalg.eigs(ATA, k=nauths)
-    xstar = np.real(xstar)
-    xstar[xstar < thresh] = 0
+    accept = False
+    # Sometimes the sparse eigen solver does not converge to the right solution
+    # Yielding a principal vector with very very small (order 1e-18), all negative components
+    # When this is the case the result is rejected and the solver is launched again
+    while not accept :
+        w, xstar = sparse.linalg.eigs(ATA, k=nauths, which="LM")
+        xstar = np.real(xstar)
+        xstar[np.abs(xstar) < 1e-10] = 0
+        accept = True
+        for i in range(0, nauths):
+            if np.all(xstar[:, i] == 0):
+                accept = False
     return xstar, nodes
 
 
@@ -226,10 +235,24 @@ def compute_hubs(subgraph, nhubs=1, thresh=1e-10):
     A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
     AT = sparse.csr_matrix.transpose(A)
     AAT = sparse.csr_matrix.dot(A, AT)
-    w, ystar = sparse.linalg.eigs(AAT, k=nhubs)
-    ystar = np.real(ystar)
-    ystar[ystar < thresh] = 0
+    accept = False
+    # Sometimes the sparse eigen solver does not converge to the right solution
+    # Yielding a principal vector with very very small (order 1e-18), all negative components
+    # When this is the case the result is rejected and the solver is launched again
+    while not accept :
+        w, ystar = sparse.linalg.eigs(AAT, k=nhubs, which="LM")
+        ystar = np.real(ystar)
+        ystar[np.abs(ystar) < 1e-10] = 0
+        accept =True
+        for i in range(0, nhubs):
+            if np.all(ystar[:, i] == 0):
+                accept = False
     return ystar, nodes
+
+
+def non_principal_auths(x, y, c)
+    x_plus_inds = np.argwhere(x > 0)
+    y_plus_inds = np.argwhere(y > 0)
 
 
 
@@ -302,4 +325,4 @@ print(top_hubs_similarity)
 
 
 
-testauths, nodes_test = compute_authorities(subtest_topic, nauths=1)
+auths_eig, nodes_test = compute_authorities(subtest_topic, nauths=3)
