@@ -118,19 +118,54 @@ def query_subgraph(graph, d, attrs_df, query_string, search_in=("title", "keywor
     return graph.subgraph(expanded)
 
 
-def compute_authorities(subgraph):
+def iterate_hubs_auths(subgraph, k=20):
+    """
+    Compute hubs and authorities coefficients the iterative way
+
+    :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
+    :param k: number of iterations
+    :return: x, y, nodes respectively vector of authorities coefs, hubs coefs and nodes ordering used for computations
+    """
     nodes = list(subgraph)
     nodes.sort()
-    print(nodes)
-    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
-    AT = sparse.csr_matrix.transpose(A)
-    ATA = sparse.csr_matrix.dot(AT, A)
-    w, xstar = sparse.linalg.eigs(ATA, k=1)
-    xstar = np.real(xstar).reshape((xstar.shape[0], ))
-    print(xstar[:10])
-    indsort = np.argsort(xstar)[::-1]
-    nodes = np.array(nodes)
-    return nodes[indsort]
+    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes) #.asfptype()
+    n = len(nodes)
+    y = np.ones((n, ))
+    x = np.ones((n, ))
+    for i in range(0, k):
+        x = sparse.csr_matrix.dot(sparse.csr_matrix.transpose(A), y)
+        y = sparse.csr_matrix.dot(A, x)
+        x *= (1 / np.linalg.norm(x))
+        y *= (1 / np.linalg.norm(y))
+    return x, y, nodes
+
+
+def sort_nodes(xy, nodes_list):
+    """
+    Return list of nodes sorted by authority coefs (xy = authorities coefs) or hubs coef (xy = hubs coefs)
+
+    :param xy: authorities coefs vector or hubs coefs vector
+    :param nodes_list: list of actual nodes in bijection with the range index of xy
+    :return: nodes from nodes list sorted by authorities coefs or hubs coefs depending on what xy is.
+    """
+    xind = np.argsort(xy)
+    return np.array(nodes_list)[xind]
+
+
+
+#def compute_authorities(subgraph):
+    #    nodes = list(subgraph)
+    #    nodes.sort()
+    #    print(nodes)
+    #    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
+    #    AT = sparse.csr_matrix.transpose(A)
+    #    ATA = sparse.csr_matrix.dot(AT, A)
+    #    w, xstar = sparse.linalg.eigs(ATA, k=1)
+    #    xstar = np.real(xstar).reshape((xstar.shape[0], ))
+    #    print(xstar[:10])
+    #    indsort = np.argsort(xstar)[::-1]
+    #    nodes = np.array(nodes)
+#    return nodes[indsort]
     # return np.real(xstar)
 
 
@@ -159,16 +194,18 @@ all_edges = cits_edges + refs_edges
 # Construct nx.DiGraph from stacked edges (refs + cits)
 cits_refs_graph = nx.DiGraph(all_edges)
 
+# Create the expanded subgraph on which to perform the algo
 d = 10000
-qstring = "behavioral"
+qstring = "agency problems"
 subtest = query_subgraph(cits_refs_graph, d, attrs, qstring)
 
-# search_inds = topic_query(attrs, "monetary policy")
-# inter_inds = indexlist_inter(search_inds)
-# union_inds = indexlist_union(search_inds)
+# compute hubs and authorities in an iterative fashion
+x, y, nodes = iterate_hubs_auths(subtest, k=20)
 
-# root = subgraph_root(attrs, "monetary policy")
-# expanded = expand_root(root, cits_refs_graph, 400)
+# nodes sorted by authority coef
+top_auths = sort_nodes(x, nodes)
+print(top_auths)
 
-authorities = compute_authorities(subtest)
-print(max(authorities))
+# nodes sorted by "hubness" coef
+top_hubs = sort_nodes(y, nodes)
+print(top_hubs)
