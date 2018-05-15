@@ -192,21 +192,44 @@ def sort_nodes(xy, nodes_list):
     return np.array(nodes_list)[xind]
 
 
+def compute_authorities(subgraph, nauths=1, thresh=1e-10):
+    """
+    Compute authorities coefficients the eigen vectors way
 
-#def compute_authorities(subgraph):
-    #    nodes = list(subgraph)
-    #    nodes.sort()
-    #    print(nodes)
-    #    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
-    #    AT = sparse.csr_matrix.transpose(A)
-    #    ATA = sparse.csr_matrix.dot(AT, A)
-    #    w, xstar = sparse.linalg.eigs(ATA, k=1)
-    #    xstar = np.real(xstar).reshape((xstar.shape[0], ))
-    #    print(xstar[:10])
-    #    indsort = np.argsort(xstar)[::-1]
-    #    nodes = np.array(nodes)
-#    return nodes[indsort]
-    # return np.real(xstar)
+    :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
+    :param nauths: number of principal vectors wanted
+
+    :return: xstar, nodes : respectively eigen vector stacked as columns and nodes ordering used for computations
+    """
+    nodes = list(subgraph.nodes)
+    nodes.sort()
+    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
+    AT = sparse.csr_matrix.transpose(A)
+    ATA = sparse.csr_matrix.dot(AT, A)
+    w, xstar = sparse.linalg.eigs(ATA, k=nauths)
+    xstar = np.real(xstar)
+    xstar[xstar < thresh] = 0
+    return xstar, nodes
+
+
+def compute_hubs(subgraph, nhubs=1, thresh=1e-10):
+    """
+    Compute hubs coefficients the eigen vectors way
+
+    :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
+    :param nauths: number of principal vectors wanted
+
+    :return: xstar, nodes : respectively eigen vectors stacked as columns and nodes ordering used for computations
+    """
+    nodes = list(subgraph.nodes)
+    nodes.sort()
+    A = nx.to_scipy_sparse_matrix(subgraph, nodelist=nodes).asfptype()
+    AT = sparse.csr_matrix.transpose(A)
+    AAT = sparse.csr_matrix.dot(A, AT)
+    w, ystar = sparse.linalg.eigs(AAT, k=nhubs)
+    ystar = np.real(ystar)
+    ystar[ystar < thresh] = 0
+    return ystar, nodes
 
 
 
@@ -243,7 +266,11 @@ qstring = "agency problems"
 subtest_topic = topic_query_subgraph(cits_refs_graph, d, attrs, qstring)
 
 # compute hubs and authorities in an iterative fashion
-x, y, nodes = iterate_hubs_auths(subtest_topic, k=20)
+x, y, nodes = iterate_hubs_auths(subtest_topic, k=1000)
+
+# compute authorities in the eigen vector search fasion
+auths_eig, nodes_test = compute_authorities(subtest_topic, nauths=1)
+hubs_eig, nodes_test = compute_hubs(subtest_topic, nhubs=1)
 
 # nodes sorted by authority coef
 top_auths_topic = sort_nodes(x, nodes)
@@ -275,4 +302,4 @@ print(top_hubs_similarity)
 
 
 
-
+testauths, nodes_test = compute_authorities(subtest_topic, nauths=1)
