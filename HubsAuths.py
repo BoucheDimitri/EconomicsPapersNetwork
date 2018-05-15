@@ -5,6 +5,8 @@ import networkx as nx
 import CitNet.GraphCN as GraphCN
 import scipy.sparse as sparse
 import os
+import time
+import matplotlib.pyplot as plt
 
 importlib.reload(GraphCN)
 
@@ -188,16 +190,16 @@ def sort_nodes(xy, nodes_list):
 
     :return: nodes from nodes list sorted by authorities coefs or hubs coefs depending on what xy is.
     """
-    xind = np.argsort(xy)
+    xind = np.argsort(xy)[::-1]
     return np.array(nodes_list)[xind]
 
 
-def compute_authorities(subgraph, nauths=1):
+def compute_authorities(subgraph, neigs=1):
     """
     Compute authorities coefficients the eigen vectors way
 
     :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
-    :param nauths: number of principal vectors wanted
+    :param neigs: number of principal vectors wanted
 
     :return: xstar, nodes : respectively eigen vector stacked as columns and nodes ordering used for computations
     """
@@ -211,22 +213,22 @@ def compute_authorities(subgraph, nauths=1):
     # Yielding a principal vector with very very small (order 1e-18), all negative components
     # When this is the case the result is rejected and the solver is launched again
     while not accept :
-        w, xstar = sparse.linalg.eigs(ATA, k=nauths, which="LM")
+        w, xstar = sparse.linalg.eigs(ATA, k=neigs, which="LM")
         xstar = np.real(xstar)
         xstar[np.abs(xstar) < 1e-10] = 0
         accept = True
-        for i in range(0, nauths):
+        for i in range(0, neigs):
             if np.all(xstar[:, i] == 0):
                 accept = False
     return xstar, nodes
 
 
-def compute_hubs(subgraph, nhubs=1, thresh=1e-10):
+def compute_hubs(subgraph, neigs=1):
     """
     Compute hubs coefficients the eigen vectors way
 
     :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
-    :param nauths: number of principal vectors wanted
+    :param neigs: number of principal vectors wanted
 
     :return: xstar, nodes : respectively eigen vectors stacked as columns and nodes ordering used for computations
     """
@@ -240,19 +242,20 @@ def compute_hubs(subgraph, nhubs=1, thresh=1e-10):
     # Yielding a principal vector with very very small (order 1e-18), all negative components
     # When this is the case the result is rejected and the solver is launched again
     while not accept :
-        w, ystar = sparse.linalg.eigs(AAT, k=nhubs, which="LM")
+        w, ystar = sparse.linalg.eigs(AAT, k=neigs, which="LM")
         ystar = np.real(ystar)
         ystar[np.abs(ystar) < 1e-10] = 0
         accept =True
-        for i in range(0, nhubs):
+        for i in range(0, neigs):
             if np.all(ystar[:, i] == 0):
                 accept = False
     return ystar, nodes
 
 
-def non_principal_auths(x, y, c)
-    x_plus_inds = np.argwhere(x > 0)
-    y_plus_inds = np.argwhere(y > 0)
+#def non_principal_auths(x, y, c)
+    #x_plus_inds = np.argwhere(x > 0)
+    #y_plus_inds = np.argwhere(y > 0)
+
 
 
 
@@ -285,13 +288,13 @@ cits_refs_graph = nx.DiGraph(all_edges)
 
 # Create the expanded subgraph on which to perform the algo
 d = 1000
-qstring = "agency problems"
+qstring = "information asymmetry"
 subtest_topic = topic_query_subgraph(cits_refs_graph, d, attrs, qstring)
 
 # compute hubs and authorities in an iterative fashion
 x, y, nodes = iterate_hubs_auths(subtest_topic, k=1000)
 
-# compute authorities in the eigen vector search fasion
+# compute authorities in the eigen vector search fashion
 auths_eig, nodes_test = compute_authorities(subtest_topic, nauths=1)
 hubs_eig, nodes_test = compute_hubs(subtest_topic, nhubs=1)
 
@@ -303,6 +306,37 @@ print(top_auths_topic)
 top_hubs_topic = sort_nodes(y, nodes)
 print(top_hubs_topic)
 
+
+# **************DRAW**************************************
+
+k = 5
+top_nodes = top_auths_topic[0:k]
+print(top_nodes)
+pos = nx.spring_layout(subtest_topic)
+
+nx.draw_networkx_nodes(subtest_topic, pos,
+                       nodelist=list(top_auths_topic[k:]),
+                       node_color='b',
+                       node_size=50,
+                       alpha=0.8)
+
+nx.draw_networkx_nodes(subtest_topic, pos,
+                       nodelist=list(top_auths_topic[:k]),
+                       node_color='r',
+                       node_size=100,
+                       label="Top authorities",
+                       alpha=0.8)
+
+nx.draw_networkx_nodes(subtest_topic, pos,
+                       nodelist=list(top_hubs_topic[:k]),
+                       node_color='g',
+                       node_size=100,
+                       label="Top hubs",
+                       alpha=0.8)
+
+nx.draw_networkx_edges(subtest_topic, pos,width=1.0,alpha=0.5)
+
+plt.legend()
 
 # ***************TEST ON SIMILARITY QUERY*******************************
 
@@ -324,5 +358,17 @@ print(top_hubs_similarity)
 
 
 
+# ***************TEST ON WHOLE GRAPH*********************************
 
-auths_eig, nodes_test = compute_authorities(subtest_topic, nauths=3)
+start = time.clock()
+xwhole, ywhole, nodes = iterate_hubs_auths(cits_refs_graph, k=100)
+end = time.clock()
+print(end - start)
+
+# nodes sorted by authority coef
+top_auths_whole = sort_nodes(xwhole, nodes)
+print(top_auths_whole)
+
+# nodes sorted by "hubness" coef
+top_hubs_whole = sort_nodes(ywhole, nodes)
+print(top_hubs_whole)
