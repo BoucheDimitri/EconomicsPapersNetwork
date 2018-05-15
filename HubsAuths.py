@@ -4,6 +4,7 @@ import importlib
 import networkx as nx
 import CitNet.GraphCN as GraphCN
 import scipy.sparse as sparse
+import seaborn as sns
 import os
 import time
 import matplotlib.pyplot as plt
@@ -259,10 +260,6 @@ def compute_hubs(subgraph, neigs=1):
 
 
 
-
-
-
-
 # Path to the data
 path = os.getcwd() + "/Tables/"
 
@@ -372,3 +369,25 @@ print(top_auths_whole)
 # nodes sorted by "hubness" coef
 top_hubs_whole = sort_nodes(ywhole, nodes)
 print(top_hubs_whole)
+
+
+
+# Number of citations / authority scores scatter plot
+
+rank_series = pd.Series(data=top_auths_whole)
+rank_series.sort_values(inplace=True)
+
+indegrees = dict(cits_refs_graph.in_degree())
+df = pd.DataFrame.from_dict(data=indegrees, orient="index")
+df.rename(columns={0: "n_citations"}, inplace=True)
+ncits_series = df["n_citations"].copy()
+ncits_series.sort_values(inplace=True, ascending=False)
+
+ncits_ranking = pd.Series(ncits_series.index)
+ncits_ranking.sort_values(inplace=True)
+
+plt.scatter(rank_series.index, ncits_ranking.index, s=1)
+plt.xlabel("Authority ranking")
+plt.ylabel("Number of citations ranking")
+plt.set_xscale("log")
+plt.set_yscale("log")
