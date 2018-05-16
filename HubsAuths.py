@@ -268,11 +268,43 @@ def hubs_authorities_eigen(subgraph, neigs=1):
     return results_df
 
 
-# def non_principal_auths(x, y, c):
+def non_principal_authorities(eigs_vecs_df, c):
+    """
+    Find c top authorities from set of non principal eigen vectors
+
+    :param eigs_vecs_df: DataFrame, should have 2 columns : the i-th eigen vector of ATA and the i-th eigen vector of AAT
+    :param c: Number of authorities to retrieve
+
+    :return: Top c authorities
+    """
+    x = eigs_vecs_df.iloc[0].as_matrix()
+    y = eigs_vecs_df.iloc[1].as_matrix()
+    xy = np.concatenate((x, y))
+    conc_index = eigs_vecs_df.index.append(eigs_vecs_df.index)
+    cmax_inds = np.argsort(xy)[::-1][:c]
+    cmax = conc_index[cmax_inds]
+    return cmax
 
 
+def non_principal_hubs(eigs_vecs_df, c):
+    """
+    Find c top hubs from set of non principal eigen vectors
 
-def get_citations_ranking(graph, nodes=None):
+    :param eigs_vecs_df: DataFrame, should have 2 columns : the i-th eigen vector of ATA and the i-th eigen vector of AAT
+    :param c: Number of authorities to retrieve
+
+    :return: Top c hubs
+    """
+    x = eigs_vecs_df.iloc[0].as_matrix()
+    y = eigs_vecs_df.iloc[1].as_matrix()
+    xy = np.concatenate((x, y))
+    conc_index = eigs_vecs_df.index.append(eigs_vecs_df.index)
+    cmax_inds = np.argsort(xy)[:c]
+    cmax = conc_index[cmax_inds]
+    return cmax
+
+
+def get_citations_ranking(graph, nodes=None, drop_zeros=True):
     """
     Return a series of number of citations ranks indexed by the nodes
 
@@ -287,34 +319,74 @@ def get_citations_ranking(graph, nodes=None):
         indegrees = dict(graph.in_degree())
     ncits_df = pd.DataFrame.from_dict(data=indegrees, orient="index")
     ncits_df.rename(columns={0: "ncits"}, inplace=True)
-    print(ncits_df)
+    if drop_zeros:
+        ncits_df = ncits_df[ncits_df["ncits"] != 0]
     ncits_df.sort_values(inplace=True, by="ncits", ascending=False)
     ncits_df["rank"] = range(0, ncits_df.shape[0])
     ncits_df.sort_index(inplace=True)
     return ncits_df["rank"]
 
 
-def plot_hubs_authorities(subgraph, auths_rank, hubs_rank, kauths=5, khubs=5, layout=nx.spring_layout):
+def get_zero_cits_nodes(graph):
+    indegrees = dict(graph.in_degree())
+    ncits_df = pd.DataFrame.from_dict(data=indegrees, orient="index")
+    ncits_df.rename(columns={0: "ncits"}, inplace=True)
+    return ncits_df[ncits_df["ncits"] == 0].index
+
+
+def get_top_autorities(hubs_auths_df, graph=None, drop_zeroscits=False):
+    if not drop_zeroscits:
+        top_auths = hubs_auths_df.sort_values(by="xauth_0", ascending=False)["xauth_0"]
+    else:
+        cits_nodes = hubs_auths_df.index.difference(get_zero_cits_nodes(graph))
+        top_auths = hubs_auths_df.loc[cits_nodes, :].sort_values(by="xauth_0", ascending=False)["xauth_0"]
+    auths_ranks = pd.Series(index=top_auths.index, data=range(0, len(top_auths)))
+    auths_ranks.sort_index(inplace=True)
+    return auths_ranks
+
+
+def plot_hubs_authorities(subgraph,
+                          auths_rank,
+                          hubs_rank,
+                          kauths=5,
+                          khubs=5,
+                          layout=nx.spring_layout,
+                          other_authorities=None,
+                          other_hubs=None):
     pos = layout(subgraph)
     nx.draw_networkx_nodes(subgraph, pos,
                            nodelist=list(auths_rank[kauths:]),
-                           node_color='b',
+                           node_color='C0',
                            node_size=75)
                            #alpha=0.8)
     nx.draw_networkx_nodes(subgraph, pos,
                            nodelist=list(auths_rank[:kauths]),
-                           node_color='r',
+                           node_color='C1',
                            node_size=150,
                            label="Top authorities")
                            #alpha=0.8)
     nx.draw_networkx_nodes(subgraph, pos,
                            nodelist=list(hubs_rank[:khubs]),
-                           node_color='g',
+                           node_color='C2',
                            node_size=150,
                            label="Top hubs")
                            #alpha=0.8)
+    if other_authorities:
+        nx.draw_networkx_nodes(subgraph, pos,
+                               nodelist=other_authorities,
+                               node_color='C3',
+                               node_size=150,
+                               label="Non principal authorities (2nd largest eigen value)")
+    if other_hubs:
+        nx.draw_networkx_nodes(subgraph, pos,
+                               nodelist=other_hubs,
+                               node_color='C4',
+                               node_size=150,
+                               label="Non principal hubs (2nd largest eigen value)")
     nx.draw_networkx_edges(subgraph, pos, width=1.0, alpha=0.5)
     plt.legend()
+
+
 
 
 # *************** LOAD DATA AND CONSTRUCT GRAPH ********************
@@ -339,6 +411,8 @@ all_edges = cits_edges + refs_edges
 cits_refs_graph = nx.DiGraph(all_edges)
 
 
+
+
 # ***************TEST ON TOPIC QUERY*********************************
 # Create the expanded subgraph on which to perform the algo
 d = 1000
@@ -349,7 +423,7 @@ subtest_topic = topic_query_subgraph(cits_refs_graph, d, attrs, query_list)
 hubs_auths_df = iterate_hubs_auths(subtest_topic, k=1000)
 
 # compute authorities in the eigen vector search fashion
-hubs_auths_eig = hubs_authorities_eigen(subtest_topic, neigs=5)
+hubs_auths_eig = hubs_authorities_eigen(subtest_topic, neigs=1)
 
 # nodes sorted by authority coef
 top_auths_topic = hubs_auths_df.sort_values(by="xauth_0", ascending=False).index
@@ -362,6 +436,15 @@ print(top_hubs_topic)
 # Draw
 plot_hubs_authorities(subtest_topic, top_auths_topic, top_hubs_topic)
 
+# Test of 1st non principal authorities and hubs
+# c = 5
+#first_eigs = hubs_auths_eig.loc[:, ["xauth_1", "xhub_1"]]
+#top_auths1 = non_principal_authorities(first_eigs, c)
+#top_hubs1 = non_principal_hubs(first_eigs, c)
+#first_eigs.iloc[top_auths1, :]
+# plot_hubs_authorities(subtest_topic, top_auths_topic, top_hubs_topic)#, other_authorities=list(top_auths1))
+
+
 
 
 # ***************TEST ON SIMILARITY QUERY*******************************
@@ -372,7 +455,7 @@ pages = []
 subtest_similarity = similarity_query_subgraph(pages, cits_refs_graph, d)
 
 # Compute hubs and authorities using eigenvector approach
-hubs_auths_sim = hubs_authorities_eigen(subtest_similarity, neigs=5)
+hubs_auths_sim = hubs_authorities_eigen(subtest_similarity, neigs=1)
 
 # Top auths of principal vector
 top_auths_sim = hubs_auths_sim.sort_values(by="xauth_0", ascending=False).index
@@ -401,17 +484,14 @@ print(top_auths_whole)
 top_hubs_whole = hubs_auths_whole.sort_values(by="xhub_0", ascending=False).index
 print(top_hubs_whole)
 
-first_nonprincipal = hubs_auths_whole.loc[:, ["xauth_1", "xhub_1"]]
-
-conc = first_nonprincipal.index.append(first_nonprincipal.index)
-
-
-c = 10
-x = hubs_auths_whole["xauth_1"].as_matrix()
-y = hubs_auths_whole["xhub_1"].as_matrix()
-xy = np.concatenate((x, y))
-cmax_ind = np.argsort(xy)[::-1][:c]
-
-cmax = conc[cmax_ind]
-
-clargest = first_nonprincipal.nlargest(c, columns=["xhub_1"])
+# Correlation plot between ncitations and authority score
+cits_ranks = get_citations_ranking(cits_refs_graph, drop_zeros=True)
+auths_ranks = get_top_autorities(hubs_auths_whole, cits_refs_graph, drop_zeroscits=True)
+df = pd.DataFrame(columns=["cits_rank", "authority_rank"])
+df["cits_rank"] = cits_ranks
+df["authority_rank"] = auths_ranks
+sns.jointplot("cits_rank", "authority_rank", df, kind="kde")
+# xmin, xmax = plt.xlim()
+# # plt.xlim(xmax, xmin)
+# ymin, ymax = plt.ylim()
+# plt.ylim(ymax, ymin)
