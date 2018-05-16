@@ -328,6 +328,13 @@ def get_citations_ranking(graph, nodes=None, drop_zeros=True):
 
 
 def get_zero_cits_nodes(graph):
+    """
+    Get nodes that have 0 citations
+
+    :param graph: (networkx.classes.digraph.DiGraph) the graph
+
+    :return: pandas integer index, the nodes that gets zero citations
+    """
     indegrees = dict(graph.in_degree())
     ncits_df = pd.DataFrame.from_dict(data=indegrees, orient="index")
     ncits_df.rename(columns={0: "ncits"}, inplace=True)
@@ -335,6 +342,15 @@ def get_zero_cits_nodes(graph):
 
 
 def get_top_autorities(hubs_auths_df, graph=None, drop_zeroscits=False):
+    """
+    Get top authorities with possibility to eliminate the nodes that gets 0 citations from the ranking
+
+    :param hubs_auths_df: DataFrame having columns ["xauth_0", "xhub_0"]
+    :param graph: (networkx.classes.digraph.DiGraph) the graph
+    :param drop_zeroscits: (bool), should nodes with 0 citations be included in the ranking
+
+    :return: pandas Series, index is the node, the value is the rank
+    """
     if not drop_zeroscits:
         top_auths = hubs_auths_df.sort_values(by="xauth_0", ascending=False)["xauth_0"]
     else:
