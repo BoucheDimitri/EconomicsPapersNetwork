@@ -12,21 +12,28 @@ import matplotlib.pyplot as plt
 importlib.reload(GraphCN)
 
 
-def topic_query(attrs_df, query_string, search_in=("title", "keywords")):
+def topic_query(attrs_df, query_list, search_in=("title", "keywords")):
     """
     Return indexes corresponding to a given query
 
     :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
-    :param query_string: (str) The query string
+    :param query_list: list of keywords
     :param search_in: (tuple) The columns to include for the query
 
     :return: list : the list of result indexes, one per column in search_in
     """
     inds = []
     for col in search_in:
-        bool_ind = attrs_df[col].str.contains(query_string, regex=False)
-        bool_ind = bool_ind.replace(np.nan, False)
-        inds.append(attrs_df[bool_ind].index)
+        first = True
+        for query in query_list:
+            bool_ind = attrs_df[col].str.contains(query, regex=False)
+            bool_ind = bool_ind.replace(np.nan, False)
+            if first:
+                inds_query = attrs_df[bool_ind].index
+                first = False
+            else:
+                inds_query = inds_query.intersection(attrs_df[bool_ind].index)
+        inds.append(inds_query)
     return inds
 
 
@@ -66,18 +73,18 @@ def indexlist_union(indexlist):
     return inter
 
 
-def topic_subgraph_root(attrs_df, query_string, search_in=("title", "keywords"), how="union"):
+def topic_subgraph_root(attrs_df, query_list, search_in=("title", "keywords"), how="union"):
     """
     Root nodes for building a subgraph relevant to a topic based query
 
     :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
-    :param query_string: (str) The query string
+    :param query_list (list) : list of keywords
     :param search_in: (tuple) The columns to include for the query
     :param how: (str) How to join the indexes in the list ?
 
     :return: the index of the nodes (pandas.indexes.range.RangeIndex)
     """
-    inds = topic_query(attrs_df, query_string, search_in)
+    inds = topic_query(attrs_df, query_list, search_in)
     if how == "inter":
         return indexlist_inter(inds)
     else:
@@ -126,20 +133,20 @@ def expand_root(root_nodes, graph, d):
     return nodes
 
 
-def topic_query_subgraph(graph, d, attrs_df, query_string, search_in=("title", "keywords"), how="union"):
+def topic_query_subgraph(graph, d, attrs_df, query_list, search_in=("title", "keywords"), how="union"):
     """
     Find expanded subgraph for a query
 
     :param graph: (networkx.classes.digraph.DiGraph) the graph
     :param d: how many predecessors to include at most ?
     :param attrs_df: (pandas.core.frame.DataFrame) Dataframe on which to perform the query
-    :param query_string: (str) The query string
+    :param query_list: (list) List of keywords
     :param search_in: (tuple) The columns to include for the query
     :param how: (str) How to join the indexes in the list ?
 
     :return: (networkx.classes.digraph.DiGraph) the expanded subgraph for the query
     """
-    root_nodes = topic_subgraph_root(attrs_df, query_string, search_in, how)
+    root_nodes = topic_subgraph_root(attrs_df, query_list, search_in, how)
     expanded = expand_root(root_nodes, graph, d)
     return graph.subgraph(expanded)
 
@@ -179,20 +186,10 @@ def iterate_hubs_auths(subgraph, k=20):
         y = sparse.csr_matrix.dot(A, x)
         x *= (1 / np.linalg.norm(x))
         y *= (1 / np.linalg.norm(y))
-    return x, y, nodes
-
-
-def sort_nodes(xy, nodes_list):
-    """
-    Return list of nodes sorted by authority coefs (xy = authorities coefs) or hubs coef (xy = hubs coefs)
-
-    :param xy: authorities coefs vector or hubs coefs vector
-    :param nodes_list: list of actual nodes in bijection with the range index of xy
-
-    :return: nodes from nodes list sorted by authorities coefs or hubs coefs depending on what xy is.
-    """
-    xind = np.argsort(xy)[::-1]
-    return np.array(nodes_list)[xind]
+    results_df = pd.DataFrame(index=nodes)
+    results_df["xauth_0"] = x
+    results_df["xhubs_0"] = y
+    return results_df
 
 
 def compute_authorities(subgraph, neigs=1):
@@ -219,7 +216,7 @@ def compute_authorities(subgraph, neigs=1):
         xstar[np.abs(xstar) < 1e-10] = 0
         accept = True
         for i in range(0, neigs):
-            if np.all(xstar[:, i] == 0):
+            if np.all(xstar[:, i] <= 0):
                 accept = False
     return xstar, nodes
 
@@ -246,20 +243,81 @@ def compute_hubs(subgraph, neigs=1):
         w, ystar = sparse.linalg.eigs(AAT, k=neigs, which="LM")
         ystar = np.real(ystar)
         ystar[np.abs(ystar) < 1e-10] = 0
-        accept =True
+        accept = True
         for i in range(0, neigs):
-            if np.all(ystar[:, i] == 0):
+            if np.all(ystar[:, i] <= 0):
                 accept = False
     return ystar, nodes
 
 
-#def non_principal_auths(x, y, c)
-    #x_plus_inds = np.argwhere(x > 0)
-    #y_plus_inds = np.argwhere(y > 0)
+def hubs_authorities_eigen(subgraph, neigs=1):
+    """
+    Wraps the result from compute_hubs and compute_authorities functions in a dataframe
+
+    :param subgraph: a subgraph (networkx.classes.digraph.DiGraph)
+    :param neigs: number of principal vectors wanted
+
+    :return: Dataframe containing the principal vectors, indexed with nodes
+    """
+    xstar, nodes = compute_authorities(subgraph, neigs)
+    ystar, nodes = compute_hubs(subgraph, neigs)
+    results_df = pd.DataFrame(index=nodes)
+    for i in range(0, neigs):
+        results_df["xauth_" + str(i)] = xstar[:, i]
+        results_df["xhub_" + str(i)] = ystar[:, i]
+    return results_df
+
+
+# def non_principal_auths(x, y, c):
 
 
 
+def get_citations_ranking(graph, nodes=None):
+    """
+    Return a series of number of citations ranks indexed by the nodes
 
+    :param graph: (networkx.classes.digraph.DiGraph) the graph
+    :param nodes: (list) nodes to rank
+
+    :return: pandas Series of ranking indexed by the nodes
+    """
+    if nodes :
+        indegrees = dict(graph.in_degree(nodes))
+    else:
+        indegrees = dict(graph.in_degree())
+    ncits_df = pd.DataFrame.from_dict(data=indegrees, orient="index")
+    ncits_df.rename(columns={0: "ncits"}, inplace=True)
+    print(ncits_df)
+    ncits_df.sort_values(inplace=True, by="ncits", ascending=False)
+    ncits_df["rank"] = range(0, ncits_df.shape[0])
+    ncits_df.sort_index(inplace=True)
+    return ncits_df["rank"]
+
+
+def plot_hubs_authorities(subgraph, auths_rank, hubs_rank, kauths=5, khubs=5, layout=nx.spring_layout):
+    pos = layout(subgraph)
+    nx.draw_networkx_nodes(subgraph, pos,
+                           nodelist=list(auths_rank[kauths:]),
+                           node_color='b',
+                           node_size=75)
+                           #alpha=0.8)
+    nx.draw_networkx_nodes(subgraph, pos,
+                           nodelist=list(auths_rank[:kauths]),
+                           node_color='r',
+                           node_size=150,
+                           label="Top authorities")
+                           #alpha=0.8)
+    nx.draw_networkx_nodes(subgraph, pos,
+                           nodelist=list(hubs_rank[:khubs]),
+                           node_color='g',
+                           node_size=150,
+                           label="Top hubs")
+                           #alpha=0.8)
+    nx.draw_networkx_edges(subgraph, pos, width=1.0, alpha=0.5)
+    plt.legend()
+
+
+# *************** LOAD DATA AND CONSTRUCT GRAPH ********************
 # Path to the data
 path = os.getcwd() + "/Tables/"
 
@@ -282,112 +340,78 @@ cits_refs_graph = nx.DiGraph(all_edges)
 
 
 # ***************TEST ON TOPIC QUERY*********************************
-
 # Create the expanded subgraph on which to perform the algo
 d = 1000
-qstring = "information asymmetry"
-subtest_topic = topic_query_subgraph(cits_refs_graph, d, attrs, qstring)
+query_list = ["asymmetry", "trading"]
+subtest_topic = topic_query_subgraph(cits_refs_graph, d, attrs, query_list)
 
 # compute hubs and authorities in an iterative fashion
-x, y, nodes = iterate_hubs_auths(subtest_topic, k=1000)
+hubs_auths_df = iterate_hubs_auths(subtest_topic, k=1000)
 
 # compute authorities in the eigen vector search fashion
-auths_eig, nodes_test = compute_authorities(subtest_topic, nauths=1)
-hubs_eig, nodes_test = compute_hubs(subtest_topic, nhubs=1)
+hubs_auths_eig = hubs_authorities_eigen(subtest_topic, neigs=5)
 
 # nodes sorted by authority coef
-top_auths_topic = sort_nodes(x, nodes)
+top_auths_topic = hubs_auths_df.sort_values(by="xauth_0", ascending=False).index
 print(top_auths_topic)
 
 # nodes sorted by "hubness" coef
-top_hubs_topic = sort_nodes(y, nodes)
+top_hubs_topic = hubs_auths_df.sort_values(by="xhubs_0", ascending=False).index
 print(top_hubs_topic)
 
+# Draw
+plot_hubs_authorities(subtest_topic, top_auths_topic, top_hubs_topic)
 
-# **************DRAW**************************************
 
-k = 5
-top_nodes = top_auths_topic[0:k]
-print(top_nodes)
-pos = nx.spring_layout(subtest_topic)
-
-nx.draw_networkx_nodes(subtest_topic, pos,
-                       nodelist=list(top_auths_topic[k:]),
-                       node_color='b',
-                       node_size=50,
-                       alpha=0.8)
-
-nx.draw_networkx_nodes(subtest_topic, pos,
-                       nodelist=list(top_auths_topic[:k]),
-                       node_color='r',
-                       node_size=100,
-                       label="Top authorities",
-                       alpha=0.8)
-
-nx.draw_networkx_nodes(subtest_topic, pos,
-                       nodelist=list(top_hubs_topic[:k]),
-                       node_color='g',
-                       node_size=100,
-                       label="Top hubs",
-                       alpha=0.8)
-
-nx.draw_networkx_edges(subtest_topic, pos,width=1.0,alpha=0.5)
-
-plt.legend()
 
 # ***************TEST ON SIMILARITY QUERY*******************************
 
 # Create the expanded subgraph on which to perform the algo
-d = 1000
-pages = [3168]
+d = 300
+pages = []
 subtest_similarity = similarity_query_subgraph(pages, cits_refs_graph, d)
 
-# compute hubs and authorities in an iterative fashion
-x, y, nodes = iterate_hubs_auths(subtest_similarity, k=20)
+# Compute hubs and authorities using eigenvector approach
+hubs_auths_sim = hubs_authorities_eigen(subtest_similarity, neigs=5)
 
-# nodes sorted by authority coef
-top_auths_similarity = sort_nodes(x, nodes)
-print(top_auths_similarity)
+# Top auths of principal vector
+top_auths_sim = hubs_auths_sim.sort_values(by="xauth_0", ascending=False).index
 
-# nodes sorted by "hubness" coef
-top_hubs_similarity = sort_nodes(y, nodes)
-print(top_hubs_similarity)
+# Top hubs of principal vector
+top_hubs_sim = hubs_auths_sim.sort_values(by="xhub_0", ascending=False).index
+
+# Draw
+plot_hubs_authorities(subtest_similarity, top_auths_sim, top_hubs_sim)
+
 
 
 
 # ***************TEST ON WHOLE GRAPH*********************************
 
 start = time.clock()
-xwhole, ywhole, nodes = iterate_hubs_auths(cits_refs_graph, k=100)
+hubs_auths_whole = hubs_authorities_eigen(cits_refs_graph, neigs=5)
 end = time.clock()
 print(end - start)
 
 # nodes sorted by authority coef
-top_auths_whole = sort_nodes(xwhole, nodes)
+top_auths_whole = hubs_auths_whole.sort_values(by="xauth_0", ascending=False).index
 print(top_auths_whole)
 
 # nodes sorted by "hubness" coef
-top_hubs_whole = sort_nodes(ywhole, nodes)
+top_hubs_whole = hubs_auths_whole.sort_values(by="xhub_0", ascending=False).index
 print(top_hubs_whole)
 
+first_nonprincipal = hubs_auths_whole.loc[:, ["xauth_1", "xhub_1"]]
+
+conc = first_nonprincipal.index.append(first_nonprincipal.index)
 
 
-# Number of citations / authority scores scatter plot
+c = 10
+x = hubs_auths_whole["xauth_1"].as_matrix()
+y = hubs_auths_whole["xhub_1"].as_matrix()
+xy = np.concatenate((x, y))
+cmax_ind = np.argsort(xy)[::-1][:c]
 
-rank_series = pd.Series(data=top_auths_whole)
-rank_series.sort_values(inplace=True)
+cmax = conc[cmax_ind]
 
-indegrees = dict(cits_refs_graph.in_degree())
-df = pd.DataFrame.from_dict(data=indegrees, orient="index")
-df.rename(columns={0: "n_citations"}, inplace=True)
-ncits_series = df["n_citations"].copy()
-ncits_series.sort_values(inplace=True, ascending=False)
-
-ncits_ranking = pd.Series(ncits_series.index)
-ncits_ranking.sort_values(inplace=True)
-
-plt.scatter(rank_series.index, ncits_ranking.index, s=1)
-plt.xlabel("Authority ranking")
-plt.ylabel("Number of citations ranking")
-plt.set_xscale("log")
-plt.set_yscale("log")
+clargest = first_nonprincipal.nlargest(c, columns=["xhub_1"])
