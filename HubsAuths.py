@@ -488,7 +488,8 @@ plot_hubs_authorities(subtest_similarity, top_auths_sim, top_hubs_sim)
 # ***************TEST ON WHOLE GRAPH*********************************
 
 start = time.clock()
-hubs_auths_whole = hubs_authorities_eigen(cits_refs_graph, neigs=5)
+# hubs_auths_whole = hubs_authorities_eigen(cits_refs_graph, neigs=1)
+hubs_auths_whole = iterate_hubs_auths(cits_refs_graph, k=1000)
 end = time.clock()
 print(end - start)
 
