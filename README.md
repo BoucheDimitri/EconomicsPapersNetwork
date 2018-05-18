@@ -16,19 +16,19 @@ Most of our visual results can be seen in the Notebooks 'DescStat.ipynb' and 'Ra
 
       * The folder **CitNet** contains all the functions that we wrote for pre processing of the database and construction of the graph       wrappeed up as a Python module.
 
-      * 'AuthorsGraph.py' uses tools from our **CitNet** module as well as processed data tablesto construct the graph of authors             collaboration.
+      * `AuthorsGraph.py` uses tools from our **CitNet** module as well as processed data tablesto construct the graph of authors             collaboration.
 
-      * 'CleanAuthors.py' uses tools from our **CitNet** module to parse authors from original data and perform desambiguitation of           authors
+      * `CleanAuthors.py` uses tools from our **CitNet** module to parse authors from original data and perform desambiguitation of           authors
 
-      * 'DbScrap.py' uses tools from our **CitNet** module to scrap the RePec database
+      * `DbScrap.py` uses tools from our **CitNet** module to scrap the RePec database
 
-      * 'HubsAuths.py' contains our functions for the implementation of the HITS algorithm as well as example of use and visualization         at the end of the file.
+      * `HubsAuths.py` contains our functions for the implementation of the HITS algorithm as well as example of use and visualization         at the end of the file.
 
-      * 'PageRank.py' contains our implementation of the PageRank algorithm.
+      * `PageRank.py` contains our implementation of the PageRank algorithm.
 
-      * 'RefsCitsProcessing.py' uses tools from our **CitNet** module to construct the graph of citations & references from our raw           scrapped database
+      * `RefsCitsProcessing.py` uses tools from our **CitNet** module to construct the graph of citations & references from our raw           scrapped database
 
-3 . Csv Files
+3. Csv Files
 
     * The folder **Tables** contains the processed data that can be used easily to construct the collaboration graphs, the citations and     references graph and relate them to the attributes of the articles. 
 
