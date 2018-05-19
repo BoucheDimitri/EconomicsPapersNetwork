@@ -1,11 +1,11 @@
 # EconomicsPapersNetwork
 Authors : Dimitri Bouche & Cyril Verluise
 
-* **Brief presentation:** In this repository, we implement tools to scrap, process, and exploit a relationnal database of Economics articles (containing both contextual informations on the articles and references and citations between articles). The final objective being comparing the performances of different search algorithms that uses graph structure such as HITS (Hubs and Authorities), PageRank and some derivatives of those algorithms*.
+* **Brief presentation:** In this repository, we implement tools to scrap, process, and exploit a relationnal database of Economics articles (containing both contextual informations on the articles and references and citations between articles). The final objective being comparing the performances of different search algorithms that uses graph structure such as HITS (Hubs and Authorities), PageRank and some derivatives of those algorithms.
 
 ## Getting started
 
-Most of our visual results can be seen in the Notebooks 'DescStat.ipynb' and 'Ranking.ipynb'. They both leverage the processed database and the other part of the codes, so they are kind of the finised product.
+Most of our visual results can be seen in the Notebooks 'DescStat.ipynb' and 'Ranking.ipynb'. They both leverage the processed database and the other part of the codes, so they are kind of the finished product.
 
 ## Structure
 
